@@ -1,1 +1,1 @@
-export * from './ip_tools';
+module.exports = require('./ip_tools.js');
