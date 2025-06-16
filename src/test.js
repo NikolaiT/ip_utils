@@ -1,6 +1,6 @@
 const { networkToStartAndEndStr,
   parseIPv6Cidr, isIPv6Inetnum, isIPv4Inetnum,
-  isIPv4Cidr, isIPv6Cidr, abbreviateIPv6 } = require('./ip_utils');
+  isIPv4Cidr, isIPv6Cidr, abbreviateIPv6 } = require('./ip_tools');
 
 if (process.argv[2] === 'inetnumToFilename') {
   console.log('2610:1d8::', inetnumToFilename('2610:1d8::'));

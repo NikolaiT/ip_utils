@@ -2,7 +2,7 @@ const { IPv6 } = require('ip-num');
 const { IPv6CidrToInt, IPv4CidrToInt, isASN, getNetworkType, networkToStartAndEndStr, parseIPv4Cidr,
   parseIPv6Cidr, isIPv4Network, isIPv6Inetnum, isIPv4Inetnum,
   isIPv4Cidr, isIPv6Cidr, isInetnum, isInInetnum, abbreviateIPv6,
-  IPv6IsLargerThan, isIPv6Strict, collapseIPv6OwnFormat, uncollapseIPv6OwnFormat } = require('./ip_utils');
+  IPv6IsLargerThan, isIPv6Strict, collapseIPv6OwnFormat, uncollapseIPv6OwnFormat } = require('./ip_tools');
 
 const testIpUtils = () => {
   // test IPv6CidrToInt
