@@ -1,0 +1,13 @@
+log/
+node_modules/
+package-lock.json
+.env
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+/coverage
+/dist
+/build
+*.log
+*.tmp
+*.swp
