@@ -1,6 +1,6 @@
-# ip_utils
+# ip_address_tools
 
-This repository contains functionality regarding IP address data.
+This repository contains functionality and helper functions to work with IP addresses.
 
 ## Test everything works fine
 
