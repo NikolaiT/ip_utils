@@ -1,25 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-
-const logFile = path.join(__dirname, '../log/ip_utils.log');
-const apiErrorLogFile = path.join(__dirname, '../log/ip_utils_api_error.log');
-const debugLogFile = path.join(__dirname, '../log/ip_utils_debug.log');
-
 function log(msg, level = 'INFO') {
-  if (typeof level === 'string') {
-    level = level.toUpperCase().trim();
-  }
-  let ts = (new Date()).toLocaleString();
-  const stringified = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
-  let logMessage = `[${process.pid}][${ts}] - ${level} - ${stringified}`;
-  if (level !== 'DEBUG' && level !== 'VERBOSE') {
-    console.log(logMessage);
-    fs.appendFileSync(logFile, logMessage + '\n');
-  } else if (level === 'API_ERROR') {
-    fs.appendFileSync(apiErrorLogFile, logMessage + '\n');
-  } else {
-    fs.appendFileSync(debugLogFile, logMessage + '\n');
-  }
+  const normalizedLevel = typeof level === 'string' ? level.toUpperCase().trim() : String(level);
+  const timestamp = new Date().toLocaleString();
+  const message =
+    typeof msg === 'object' && msg !== null
+      ? JSON.stringify(msg, null, 2)
+      : String(msg);
+  const logMessage = `[${process.pid}][${timestamp}] - ${normalizedLevel} - ${message}`;
+  console.log(logMessage);
 }
 
 function getRandomInt(min, max) {
