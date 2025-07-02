@@ -79,7 +79,6 @@ const firstIpOfNet = (net) => {
     log(`Invalid net passed to firstIpOfNet(): ${net}`, 'ERROR');
     return false;
   }
-
   if (net.indexOf('/') !== -1) { // cidr
     net = cidrToInetnum(net);
   }
