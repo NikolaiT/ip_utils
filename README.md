@@ -11,7 +11,7 @@ npm test
 ## Local Installation
 
 ```bash
-npm install /Users/nikolaitschacher/projects/ip_address_tools
+npm install --save-dev /Users/nikolaitschacher/projects/ip_address_tools
 ```
 
 ## Usage

@@ -75,10 +75,15 @@ const inetnumToFilename = (inetnum) => {
 };
 
 const firstIpOfNet = (net) => {
-  if (isCidr(net)) {
+  if (typeof net !== 'string') {
+    log(`Invalid net passed to firstIpOfNet(): ${net}`, 'ERROR');
+    return false;
+  }
+
+  if (net.indexOf('/') !== -1) { // cidr
     net = cidrToInetnum(net);
   }
-  if (!isInetnum(net)) {
+  if (net.indexOf('-') === -1) { // not a valid inetnum
     log(`Invalid inetnum passed to firstIpOfNet(): ${net}`, 'ERROR');
     return false;
   }
@@ -170,10 +175,10 @@ const cidrToInetnumSpecial = (cidrNetwork) => {
 
 const cidrToInetnum = (cidr) => {
   try {
-    if (isIPv4Cidr(cidr)) {
+    if (cidr.indexOf('.') !== -1) {
       const ipv4Range = IPv4CidrRange.fromCidr(cidr);
       return `${ipv4Range.getFirst().toString()} - ${ipv4Range.getLast().toString()}`;
-    } else if (isIPv6Cidr(cidr)) {
+    } else if (cidr.indexOf(':') !== -1) {
       const ipv6Range = IPv6CidrRange.fromCidr(cidr);
       return `${ipv6Range.getFirst().toString()} - ${ipv6Range.getLast().toString()}`;
     }
