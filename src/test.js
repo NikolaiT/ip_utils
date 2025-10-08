@@ -1,6 +1,6 @@
 const { networkToStartAndEndStr,
   parseIPv6Cidr, isIPv6Inetnum, isIPv4Inetnum,
-  isIPv4Cidr, isIPv6Cidr, abbreviateIPv6 } = require('./ip_tools');
+  isIPv4Cidr, isIPv6Cidr, abbreviateIPv6, getRandomIPv4ByRIR } = require('./ip_tools');
 
 if (process.argv[2] === 'inetnumToFilename') {
   console.log('2610:1d8::', inetnumToFilename('2610:1d8::'));
@@ -190,4 +190,6 @@ if (process.argv[2] === 'inetnumToFilename') {
   console.log(getInetnumAndCidrFromNetwork('2a02:2450:0000:0000:0000:0000:0000:0000 - 2a02:2450:0000:0000:0000:0000:0000:00ff'));
   console.log(getInetnumAndCidrFromNetwork('192.168.1.0/22'));
   console.log(getInetnumAndCidrFromNetwork('2a02:2450::/32'));
+} else if (process.argv[2] === 'getRandomIPv4ByRIR') {
+  console.log(getRandomIPv4ByRIR('ARIN', 100));
 }

@@ -1004,9 +1004,9 @@ function getRandomIPv4(excludeBogon = true) {
   }
 }
 
-function getRandomIPv4ByRIR(rir, num = 100) {
+function getRandomIPv4ByRIR(rir, num = 100, excludeBogon = true) {
   let prefixesForRir = [];
-  const ipSpace = JSON.parse(fs.readFileSync(path.join(__dirname, './../ipapi_database/info_data/ipv4-address-space.json'), 'utf-8'));
+  const ipSpace = JSON.parse(fs.readFileSync(path.join(__dirname, './../../ip_api_data/ipapi_database/info_data/ipv4-address-space.json'), 'utf-8'));
   for (const prefix in ipSpace) {
     const org = ipSpace[prefix];
     if (org === rir) {
@@ -1014,10 +1014,17 @@ function getRandomIPv4ByRIR(rir, num = 100) {
     }
   }
   let ips = [];
-  for (let i = 0; i < num; i++) {
+  while (ips.length < num) {
     const randomIndex = getRandomInt(0, prefixesForRir.length - 1);
     const randomPrefix = prefixesForRir[randomIndex];
-    ips.push(randomPrefix + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255));
+    const ip = randomPrefix + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255);
+    if (excludeBogon) {
+      if (!isBogon(ip)) {
+        ips.push(ip);
+      }
+    } else {
+      ips.push(ip);
+    }
   }
   return ips;
 }
