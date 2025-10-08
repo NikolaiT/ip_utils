@@ -8,6 +8,13 @@ const { IPv6CidrRange } = require('ip-num');
 const { IPv4CidrRange } = require('ip-num');
 const { Validator } = require('ip-num');
 
+/**
+ * Validates whether the provided network string represents a sane IPv4 or IPv6 range.
+ * Accepts either CIDR or inetnum style strings and verifies ordering of bounds.
+ *
+ * @param {string} net - Network description in CIDR or inetnum form.
+ * @returns {boolean} True when the network boundaries are well formed.
+ */
 const isValidNetwork = (net) => {
   if (isCidr(net)) {
     net = cidrToInetnum(net);
@@ -43,15 +50,11 @@ const isValidNetwork = (net) => {
 };
 
 /**
- * Convert the network into a file friendly format.
- * abbreviateIPv6
- * 2001:502:7094:: - 2001:502:7094:FFFF:FFFF:FFFF:FFFF:FFFF =>
- * xyz
- * 
- * 162.250.160.0 - 162.250.160.255 =>
- * xyz
- * 
- * @param {*} inetnum 
+ * Converts a CIDR/inetnum range into a deterministic filename-friendly token.
+ * Embeds the IP version (4/6) and numeric start/end boundaries for easy sorting.
+ *
+ * @param {string} inetnum - Network range expressed as inetnum or CIDR string.
+ * @returns {string|false} Encoded filename chunk or false when the input is invalid.
  */
 const inetnumToFilename = (inetnum) => {
   if (isCidr(inetnum)) {
@@ -74,6 +77,12 @@ const inetnumToFilename = (inetnum) => {
   }
 };
 
+/**
+ * Returns the lowest IP address contained in a CIDR or inetnum string.
+ *
+ * @param {string} net - Network in CIDR or inetnum notation.
+ * @returns {string|false} First IP as string, or false on malformed input.
+ */
 const firstIpOfNet = (net) => {
   if (typeof net !== 'string') {
     log(`Invalid net passed to firstIpOfNet(): ${net}`, 'ERROR');
@@ -91,6 +100,12 @@ const firstIpOfNet = (net) => {
   return start;
 };
 
+/**
+ * Extracts both endpoints of a network, converting CIDR input to inetnum form when required.
+ *
+ * @param {string} net - Network in CIDR or inetnum notation.
+ * @returns {string[]|false} Tuple [startIp, endIp] or false when validation fails.
+ */
 const getFirstAndLastIpOfNetwork = (net) => {
   if (isCidr(net)) {
     net = cidrToInetnum(net);
@@ -104,6 +119,12 @@ const getFirstAndLastIpOfNetwork = (net) => {
   return [start, end];
 };
 
+/**
+ * Calculates the next sequential IPv4/IPv6 address.
+ *
+ * @param {string} ip - Source IP.
+ * @returns {string|false} Incremented IP, or false when the input is not an IP.
+ */
 const getNextIp = (ip) => {
   ip = ip.trim();
   if (isIPv4(ip)) {
@@ -118,6 +139,12 @@ const getNextIp = (ip) => {
   }
 }
 
+/**
+ * Returns the first IP address that follows the provided network range.
+ *
+ * @param {string} net - Network in CIDR or inetnum notation.
+ * @returns {string|false} Next IP after the range or false if the network is invalid.
+ */
 const getNextIpOfNet = (net) => {
   if (isCidr(net)) {
     net = cidrToInetnum(net);
@@ -130,6 +157,12 @@ const getNextIpOfNet = (net) => {
   return getNextIp(end.trim());
 }
 
+/**
+ * Calculates the previous sequential IPv4/IPv6 address.
+ *
+ * @param {string} ip - Source IP.
+ * @returns {string|false} Decremented IP, or false when input is invalid.
+ */
 const getPreviousIp = (ip) => {
   ip = ip.trim();
   if (isIPv4(ip)) {
@@ -172,6 +205,12 @@ const cidrToInetnumSpecial = (cidrNetwork) => {
   }
 };
 
+/**
+ * Converts IPv4 or IPv6 CIDR strings into inetnum style inclusive ranges.
+ *
+ * @param {string} cidr - CIDR formatted network.
+ * @returns {string|null} Inetnum string or null when conversion fails.
+ */
 const cidrToInetnum = (cidr) => {
   try {
     if (cidr.indexOf('.') !== -1) {
@@ -188,6 +227,12 @@ const cidrToInetnum = (cidr) => {
   }
 };
 
+/**
+ * Determines if the given string is a valid IPv4 literal.
+ *
+ * @param {string} s - Candidate IPv4 string.
+ * @returns {boolean} True when the string parses as IPv4.
+ */
 function isIPv4(s) {
   try {
     return Validator.isValidIPv4String(s)[0];
@@ -196,6 +241,12 @@ function isIPv4(s) {
   }
 }
 
+/**
+ * Determines if the given string is a valid IPv6 literal.
+ *
+ * @param {string} s - Candidate IPv6 string.
+ * @returns {boolean} True when the string parses as IPv6.
+ */
 function isIPv6(s) {
   try {
     return Validator.isValidIPv6String(s)[0];
@@ -208,6 +259,12 @@ let extractPrefix = (ipv6String) => {
   return ipv6String.includes("/") ? `/${ipv6String.split("/")[1]}` : ""
 }
 
+/**
+ * Collapses an expanded IPv6 address to its canonical shortest representation, preserving prefix suffix.
+ *
+ * @param {string} ipv6String - IPv6 string, optionally with netmask.
+ * @returns {string} Normalised compressed IPv6 string.
+ */
 function abbreviateIPv6(ipv6String) {
   const prefix = extractPrefix(ipv6String);
   if (ipv6String.includes("/")) {
@@ -274,6 +331,13 @@ function abbreviateIPv6(ipv6String) {
   return `${contracted}${prefix}`;
 }
 
+/**
+ * Validates IPv6 input by round-tripping through big-int conversion and canonical formatting.
+ *
+ * @param {string|bigint} input - IPv6 string or big-int representation.
+ * @param {boolean} [inputIsBigInt=false] - When true, treat input as already BigInt.
+ * @returns {boolean} True when the address is valid in strict form.
+ */
 function isIPv6Strict(input, inputIsBigInt = false) {
   try {
     let asBigInt = null;
@@ -302,6 +366,14 @@ function isIPv6Strict(input, inputIsBigInt = false) {
  * @param {*} ip2 
  * @returns 
  */
+/**
+ * Compares two IPv6 addresses represented as strings or integer arrays.
+ *
+ * @param {string|number[]} ip1 - First IPv6 candidate.
+ * @param {string|number[]} ip2 - Second IPv6 candidate.
+ * @param {boolean} [alreadyInt=false] - When true, treat both inputs as pre-parsed arrays.
+ * @returns {number} 0 when equal, 1 when ip1 > ip2, -1 when ip1 < ip2.
+ */
 function IPv6IsLargerThan(ip1, ip2, alreadyInt = false) {
   let int_ip1 = null;
   let int_ip2 = null;
@@ -323,12 +395,24 @@ function IPv6IsLargerThan(ip1, ip2, alreadyInt = false) {
   return 0;
 }
 
+/**
+ * Detects the IP version for a given literal.
+ *
+ * @param {string} s - Candidate IP string.
+ * @returns {0|4|6} 4 or 6 when valid, 0 otherwise.
+ */
 function isIP(s) {
   if (isIPv4(s)) return 4;
   if (isIPv6(s)) return 6;
   return 0;
 }
 
+/**
+ * Validates whether a string is a syntactically correct IPv4 or IPv6 CIDR.
+ *
+ * @param {string} s - Candidate CIDR.
+ * @returns {boolean} True when address and mask are valid for the detected family.
+ */
 function isCidr(s) {
   if (typeof s !== 'string' || s.length === 0) return false;
 
@@ -353,10 +437,22 @@ function isCidr(s) {
   return false;
 }
 
+/**
+ * Checks if the provided string is either a CIDR or inetnum representation.
+ *
+ * @param {string} network - Network descriptor.
+ * @returns {boolean} True when the string represents a parsable network.
+ */
 function isNetwork(network) {
   return isCidr(network) || isInetnum(network);
 }
 
+/**
+ * Determines if a string is an IP, CIDR, or inetnum description.
+ *
+ * @param {string} input - Value to validate.
+ * @returns {boolean} True when the input matches any supported format.
+ */
 function isNetworkOrIp(input) {
   if (!input || typeof input !== 'string') {
     return false;
@@ -364,6 +460,12 @@ function isNetworkOrIp(input) {
   return isCidr(input) || isInetnum(input) || isIP(input);
 }
 
+/**
+ * Validates inetnum formatted ranges and returns their IP version.
+ *
+ * @param {string} inetnum - Inetnum string in the form "start - end".
+ * @returns {4|6|null} IP version or null when validation fails.
+ */
 function isInetnum(inetnum) {
   if (typeof inetnum !== 'string') {
     return false;
@@ -394,6 +496,12 @@ function isInetnum(inetnum) {
   return null;
 }
 
+/**
+ * Extracts the first IP from an inetnum range when valid.
+ *
+ * @param {string} inetnum - Inetnum string.
+ * @returns {string|undefined} Start address or undefined when invalid.
+ */
 function getInetnumStartIP(inetnum) {
   if (isInetnum(inetnum)) {
     let parts = inetnum.split('-');
@@ -402,20 +510,31 @@ function getInetnumStartIP(inetnum) {
   }
 }
 
+/**
+ * Checks if an inetnum range is IPv4-based.
+ *
+ * @param {string} inetnum - Inetnum string.
+ * @returns {boolean} True when the inetnum is IPv4.
+ */
 function isIPv4Inetnum(inetnum) {
   return isInetnum(inetnum) === 4;
 }
 
+/**
+ * Checks if an inetnum range is IPv6-based.
+ *
+ * @param {string} inetnum - Inetnum string.
+ * @returns {boolean} True when the inetnum is IPv6.
+ */
 function isIPv6Inetnum(inetnum) {
   return isInetnum(inetnum) === 6;
 }
 
 /**
- * In case the inetnum is in correct format, but with invalid ranges,
- * the return value will be 'invalidInetnum'
- * 
- * @param {*} inetnum 
- * @returns 
+ * Parses an inetnum, returning structured metadata or an error sentinel.
+ *
+ * @param {string} inetnum - Range string in inetnum format.
+ * @returns {object|'invalidInetnum'|undefined} Parsed representation with ranges and version.
  */
 function parseInetnum(inetnum) {
   let inv = isInetnum(inetnum);
@@ -455,6 +574,12 @@ function parseInetnum(inetnum) {
   }
 }
 
+/**
+ * Parses an IPv4 inetnum into integer start/end bounds.
+ *
+ * @param {string} inetnum - IPv4 inetnum string.
+ * @returns {number[]|'invalidInetnum'} Pair of integers or sentinel when invalid.
+ */
 function parseIPv4Inetnum(inetnum) {
   const hyphenIndex = inetnum.indexOf('-');
   if (hyphenIndex === -1) return 'invalidInetnum';
@@ -468,6 +593,12 @@ function parseIPv4Inetnum(inetnum) {
   return startIp > endIp ? 'invalidInetnum' : [startIp, endIp];
 }
 
+/**
+ * Converts an IPv4 CIDR into integer start/end bounds.
+ *
+ * @param {string} cidr - IPv4 CIDR string.
+ * @returns {number[]} [startInt, endInt] inclusive.
+ */
 function parseIPv4Cidr(cidr) {
   // Use indexOf and slice to avoid creating an intermediate array
   const slashIndex = cidr.indexOf('/');
@@ -488,6 +619,12 @@ function parseIPv4Cidr(cidr) {
   return [startIp, startIp + numHosts];
 }
 
+/**
+ * Converts an IPv6 CIDR into bigint start/end bounds.
+ *
+ * @param {string} cidr - IPv6 CIDR string.
+ * @returns {bigInt.BigInteger[]} Inclusive bounds as big integers.
+ */
 function parseIPv6Cidr(cidr) {
   let ipv6Range = IPv6CidrRange.fromCidr(cidr);
   return [
@@ -496,6 +633,12 @@ function parseIPv6Cidr(cidr) {
   ];
 }
 
+/**
+ * Parses an IPv6 inetnum into bigint start/end bounds.
+ *
+ * @param {string} inetnum - IPv6 inetnum string.
+ * @returns {bigInt.BigInteger[]|'invalidInetnum'} Range representation or sentinel.
+ */
 function parseIPv6Inetnum(inetnum) {
   const dashIndex = inetnum.indexOf('-');
   if (dashIndex === -1) return 'invalidInetnum';
@@ -509,6 +652,12 @@ function parseIPv6Inetnum(inetnum) {
   return [bigInt(startIp.value), bigInt(endIp.value)];
 }
 
+/**
+ * Validates IPv4 CIDR strings.
+ *
+ * @param {string} cidr - Value to test.
+ * @returns {boolean} True when the CIDR is syntactically valid.
+ */
 function isIPv4Cidr(cidr) {
   if (typeof cidr !== 'string') return false;
 
@@ -528,6 +677,12 @@ function isIPv4Cidr(cidr) {
   return isIPv4(ipPart);
 }
 
+/**
+ * Validates IPv6 CIDR strings.
+ *
+ * @param {string} cidr - Value to test.
+ * @returns {boolean} True when the CIDR is syntactically valid.
+ */
 const isIPv6Cidr = (cidr) => {
   const slashIndex = cidr.indexOf('/');
   if (slashIndex === -1 || cidr.indexOf('/', slashIndex + 1) !== -1) {
@@ -540,6 +695,12 @@ const isIPv6Cidr = (cidr) => {
   return isIPv6(cidr.slice(0, slashIndex));
 };
 
+/**
+ * Converts the address component of a CIDR to its IPv4 integer.
+ *
+ * @param {string} cidr - IPv4 CIDR string.
+ * @returns {number} Integer form of the base address.
+ */
 const IPv4CidrToInt = (cidr) => {
   const slashIndex = cidr.indexOf('/');
   if (slashIndex === -1) {
@@ -548,6 +709,12 @@ const IPv4CidrToInt = (cidr) => {
   return IPv4ToInt(cidr.slice(0, slashIndex));
 };
 
+/**
+ * Converts the address component of a CIDR to its IPv6 integer array representation.
+ *
+ * @param {string} cidr - IPv6 CIDR string.
+ * @returns {number[]} Expanded IPv6 represented as eight integers.
+ */
 const IPv6CidrToInt = (cidr) => {
   const slashIndex = cidr.indexOf('/');
   if (slashIndex === -1) {
@@ -556,6 +723,12 @@ const IPv6CidrToInt = (cidr) => {
   return IPv6ToInt(cidr.slice(0, slashIndex));
 };
 
+/**
+ * Converts an IPv6 CIDR into an inetnum string.
+ *
+ * @param {string} cidr - IPv6 CIDR string.
+ * @returns {string} Inetnum representation.
+ */
 const IPv6CidrToInetnum = (cidr) => {
   if (cidr.indexOf('/') === -1) {
     throw Error('cidr must contain /');
@@ -567,6 +740,12 @@ const IPv6CidrToInetnum = (cidr) => {
   return `${start} - ${stop}`;
 };
 
+/**
+ * Converts an IPv4 dotted quad to its unsigned integer representation.
+ *
+ * @param {string} ip_str - IPv4 address.
+ * @returns {number} Unsigned 32-bit integer.
+ */
 function IPv4ToInt(ip_str) {
   var parts = ip_str.split('.');
   var sum = 0;
@@ -577,6 +756,13 @@ function IPv4ToInt(ip_str) {
   return sum;
 }
 
+/**
+ * Normalises a network string to numeric start/end bounds with IP version metadata.
+ *
+ * @param {string} network - IP, CIDR, or inetnum.
+ * @param {boolean} [verbose=false] - Emit console diagnostics.
+ * @returns {{ipVersion:number,startIp:number|bigInt.BigInteger,endIp:number|bigInt.BigInteger}|undefined} Structured bounds or undefined on failure.
+ */
 function networkToStartAndEndInt(network, verbose = false) {
   if (isIP(network)) {
     let ipVersion = isIPv4(network) ? 4 : 6;
@@ -612,6 +798,13 @@ function networkToStartAndEndInt(network, verbose = false) {
   }
 }
 
+/**
+ * Normalises a network string to textual start/end IP bounds.
+ *
+ * @param {string} network - IP, CIDR, or inetnum.
+ * @param {boolean} [verbose=false] - Emit console diagnostics.
+ * @returns {{ipVersion:number,startIp:string,endIp:string}|undefined} Structured bounds or undefined when invalid.
+ */
 function networkToStartAndEndStr(network, verbose = false) {
   const ipVersion = isIP(network);
   if (ipVersion) {
@@ -667,6 +860,14 @@ function networkToStartAndEndStr(network, verbose = false) {
   }
 }
 
+/**
+ * Builds an inetnum string from numeric or bigint bounds.
+ *
+ * @param {number} ipVersion - Either 4 or 6.
+ * @param {number|bigInt.BigInteger} startIp - Inclusive start.
+ * @param {number|bigInt.BigInteger} endIp - Inclusive end.
+ * @returns {string|undefined} Inetnum string or undefined for unsupported versions.
+ */
 function startEndIpToNetwork(ipVersion, startIp, endIp) {
   ipVersion = parseInt(ipVersion);
   if (ipVersion === 4) {
@@ -676,6 +877,12 @@ function startEndIpToNetwork(ipVersion, startIp, endIp) {
   }
 }
 
+/**
+ * Converts an IP literal to its numeric representation (IPv4 -> number, IPv6 -> BigInt).
+ *
+ * @param {string} ip_str - IP literal.
+ * @returns {number|bigInt.BigInteger|undefined} Numeric representation or undefined when invalid.
+ */
 function IpToInt(ip_str) {
   if (isIPv4(ip_str)) {
     return IPv4ToInt(ip_str);
@@ -684,6 +891,12 @@ function IpToInt(ip_str) {
   }
 }
 
+/**
+ * Converts an IPv6 literal to a BigInt value.
+ *
+ * @param {string} ip_str - IPv6 address.
+ * @returns {bigInt.BigInteger|undefined} BigInt representation or undefined on error.
+ */
 function IPv6ToBigint(ip_str) {
   try {
     let ipv6Parsed = IPv6.fromString(ip_str);
@@ -694,12 +907,10 @@ function IPv6ToBigint(ip_str) {
 }
 
 /**
- * Example: 
- * 
- * IPv6ToInt('2605:9CC0::') => [9733, 40128, 0, 0, 0, 0, 0, 0]
- * 
- * @param {*} ipStr 
- * @returns 
+ * Expands an IPv6 literal into an array of eight 16-bit integers.
+ *
+ * @param {string} ipStr - IPv6 address.
+ * @returns {number[]} Array with eight integer segments.
  */
 const IPv6ToInt = (ipStr) => {
   try {
@@ -715,10 +926,23 @@ const IPv6ToInt = (ipStr) => {
   return as_array;
 };
 
+/**
+ * Converts an unsigned 32-bit integer to an IPv4 dotted quad.
+ *
+ * @param {number} ipInt - Unsigned 32-bit integer.
+ * @returns {string} IPv4 address.
+ */
 function IntToIPv4(ipInt) {
   return ((ipInt >>> 24) + '.' + (ipInt >> 16 & 255) + '.' + (ipInt >> 8 & 255) + '.' + (ipInt & 255));
 }
 
+/**
+ * Converts an IPv6 BigInt-compatible value to a string representation.
+ *
+ * @param {string|bigInt.BigInteger} ipv6IntString - IPv6 integer value.
+ * @param {boolean|string} [doExpand=true] - Controls expansion/collapse of the output.
+ * @returns {string} IPv6 string in the requested form.
+ */
 function IntToIPv6(ipv6IntString, doExpand = true) {
   const bInt = bigInt(ipv6IntString);
   if (doExpand === true) {
@@ -733,13 +957,10 @@ function IntToIPv6(ipv6IntString, doExpand = true) {
 }
 
 /**
- * 
- * 46.218.11.23 - 46.218.11.23 => Size: 1
- * 46.97.20.16 - 46.97.20.23 => Size: 8
- * 2602:fc05:: - 26ab:fc05:: => Size: Integer { value: 877498169092385869221653879638196225n }
- * 
- * @param {*} inetnum 
- * @returns 
+ * Calculates the host count of an inetnum range, supporting both IPv4 and IPv6.
+ *
+ * @param {string} inetnum - Inetnum string.
+ * @returns {number|bigInt.BigInteger|undefined} Number of addresses or undefined when invalid.
  */
 function numHostsInetnum(inetnum) {
   let ipv = isInetnum(inetnum);
@@ -761,10 +982,11 @@ function numHostsInetnum(inetnum) {
 }
 
 /**
- * Checks whether a certain IP address is in the provided inetnum.
- * 
- * @param {*} ip 
- * @param {*} inetnum 
+ * Checks whether a given IP literal resides inside an inetnum range.
+ *
+ * @param {string} ip - IPv4 or IPv6 address.
+ * @param {string} inetnum - Inetnum range string.
+ * @returns {boolean|undefined} True when contained; undefined on invalid arguments.
  */
 function isInInetnum(ip, inetnum) {
   if (isIPv4(ip) && isIPv4Inetnum(inetnum)) {
@@ -782,6 +1004,12 @@ function isInInetnum(ip, inetnum) {
   }
 }
 
+/**
+ * Computes the number of hosts represented by an IPv4 CIDR block.
+ *
+ * @param {string} cidr - IPv4 CIDR string.
+ * @returns {number} Total host count.
+ */
 const numHostsInCidrIPv4 = (cidr) => {
   let parts = cidr.split('/');
   let mask = parseInt(parts[1]);
@@ -791,6 +1019,12 @@ const numHostsInCidrIPv4 = (cidr) => {
   return 2 ** (32 - mask);
 };
 
+/**
+ * Computes the host count for a given IP, CIDR, or inetnum.
+ *
+ * @param {string} net - Network descriptor or IP.
+ * @returns {number|bigInt.BigInteger|'invalidNetwork'} Host count or sentinel for invalid inputs.
+ */
 const numHostsInNet = (net) => {
   try {
     if (isIP(net)) {
@@ -812,6 +1046,13 @@ const numHostsInNet = (net) => {
   return 'invalidNetwork';
 };
 
+/**
+ * Tests if an IP literal resides inside a CIDR or inetnum network.
+ *
+ * @param {string} ip - IPv4 or IPv6 address.
+ * @param {string} net - Network descriptor (CIDR or inetnum).
+ * @returns {boolean} True when the IP is inside the network.
+ */
 const isInNetwork = (ip, net) => {
   if (isIPv4Cidr(net)) {
     const ipInt = IPv4ToInt(ip);
@@ -829,6 +1070,13 @@ const isInNetwork = (ip, net) => {
   return false;
 };
 
+/**
+ * Verifies whether one network is wholly contained inside another.
+ *
+ * @param {string} net1 - Candidate subset network.
+ * @param {string} net2 - Candidate superset network.
+ * @returns {boolean} True when net1 is fully inside net2.
+ */
 const isSubset = (net1, net2) => {
   if (isIPv4Cidr(net1) && isIPv4Cidr(net2)) {
     const [startIp1, endIp1] = parseIPv4Cidr(net1);
@@ -849,6 +1097,12 @@ const isSubset = (net1, net2) => {
   return false;
 };
 
+/**
+ * Legacy helper that infers network family by probing multiple format checks.
+ *
+ * @param {string} network - Network descriptor.
+ * @returns {4|6|null} IP version or null when unknown.
+ */
 function getNetworkTypeOld(network) {
   if (isIPv4(network)) {
     return 4;
@@ -872,18 +1126,42 @@ function getNetworkTypeOld(network) {
   return null;
 }
 
+/**
+ * Quickly guesses IP version based on the presence of '.' or ':'.
+ *
+ * @param {string} network - IP or network descriptor.
+ * @returns {4|6} Detected IP version.
+ */
 const getNetworkType = (network) => {
   return network.indexOf('.') !== -1 ? 4 : 6;
 };
 
+/**
+ * Determines if a network descriptor refers to an IPv4 range.
+ *
+ * @param {string} net - Network descriptor.
+ * @returns {boolean} True when CIDR/inetnum is IPv4.
+ */
 const isIPv4Network = (net) => {
   return isIPv4Cidr(net) || isIPv4Inetnum(net);
 }
 
+/**
+ * Determines if a network descriptor refers to an IPv6 range.
+ *
+ * @param {string} net - Network descriptor.
+ * @returns {boolean} True when CIDR/inetnum is IPv6.
+ */
 const isIPv6Network = (net) => {
   return isIPv6Cidr(net) || isIPv6Inetnum(net);
 }
 
+/**
+ * Computes the number of IPv6 addresses contained in a CIDR block.
+ *
+ * @param {string} cidr - IPv6 CIDR string.
+ * @returns {bigInt.BigInteger} Host count as BigInt.
+ */
 function numHostsInCidrIPv6(cidr) {
   let parts = cidr.split('/');
   let mask = parseInt(parts[1]);
@@ -894,10 +1172,10 @@ function numHostsInCidrIPv6(cidr) {
 }
 
 /**
- * Gets the first 48 bits from an IPv6 array
- * as integers as number.
- * 
- * @param {*} ipv6_array 
+ * Extracts the first 48 bits from an expanded IPv6 array representation.
+ *
+ * @param {number[]} ipv6_array - Eight-element array of 16-bit IPv6 parts.
+ * @returns {number} Combined 48-bit prefix as number.
  */
 function first_48bits_from_IPv6(ipv6_array) {
   let result = 0;
@@ -910,16 +1188,21 @@ function first_48bits_from_IPv6(ipv6_array) {
 }
 
 /**
- * Expands the 48bits lookup key to the decimal value of an 128bit IPv6 address
- * 
- * Used to find the cutoff in the lookup search.
- * @param {*} num_48_bits 
- * @returns 
+ * Expands a 48-bit lookup key back to the decimal value of an IPv6 cutoff address.
+ *
+ * @param {number} num_48_bits - 48-bit prefix as number.
+ * @returns {number} Expanded decimal representation.
  */
 function expand_48bits(num_48_bits) {
   return parseInt(num_48_bits.toString(16) + '0000' + '0000' + '0000' + '0000' + '0000', 16);
 }
 
+/**
+ * Checks whether a string matches the canonical ASN format (AS1234).
+ *
+ * @param {string} asn - Candidate ASN.
+ * @returns {boolean} True when the identifier is valid.
+ */
 const isASN = (asn) => {
   if (typeof asn !== 'string' || asn.length < 3 || asn[0].toLowerCase() !== 'a' || asn[1].toLowerCase() !== 's') {
     return false;
@@ -932,6 +1215,11 @@ const isASN = (asn) => {
  * https://en.wikipedia.org/wiki/Reserved_IP_addresses
  * 
  * @returns all reserved IP ranges
+ */
+/**
+ * Returns a map of well-known IPv4 reserved or special-purpose ranges.
+ *
+ * @returns {Record<string,string>} Map of description to inetnum/CIDR.
  */
 const getReservedIpRanges4 = () => {
   return {
@@ -955,6 +1243,11 @@ const getReservedIpRanges4 = () => {
   };
 };
 
+/**
+ * Returns a map of well-known IPv6 reserved or special-purpose ranges.
+ *
+ * @returns {Record<string,string>} Map of description to CIDR.
+ */
 const getReservedIpRanges6 = () => {
   return {
     'Unspecified address': '::/128',
@@ -974,6 +1267,12 @@ const getReservedIpRanges6 = () => {
   };
 };
 
+/**
+ * Determines whether an IP address belongs to a reserved/bogon range.
+ *
+ * @param {string} ip - IPv4 or IPv6 address.
+ * @returns {boolean} True when the IP is considered bogon.
+ */
 const isBogon = (ip) => {
   if (isIPv4(ip)) {
     for (const net of Object.values(getReservedIpRanges4())) {
@@ -991,6 +1290,12 @@ const isBogon = (ip) => {
   return false;
 };
 
+/**
+ * Generates a random IPv4 address, optionally avoiding bogon ranges.
+ *
+ * @param {boolean} [excludeBogon=true] - When true, skip reserved ranges.
+ * @returns {string} Random IPv4 address.
+ */
 function getRandomIPv4(excludeBogon = true) {
   while (true) {
     let randomIPv4 = `${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
@@ -1004,6 +1309,14 @@ function getRandomIPv4(excludeBogon = true) {
   }
 }
 
+/**
+ * Samples random IPv4 addresses that belong to allocations of a specific RIR.
+ *
+ * @param {string} rir - Target RIR label.
+ * @param {number} [num=100] - Number of addresses to return.
+ * @param {boolean} [excludeBogon=true] - Skip bogon ranges when true.
+ * @returns {string[]} Array of IPv4 addresses.
+ */
 function getRandomIPv4ByRIR(rir, num = 100, excludeBogon = true) {
   let prefixesForRir = [];
   const ipSpace = JSON.parse(fs.readFileSync(path.join(__dirname, './../../ip_api_data/ipapi_database/info_data/ipv4-address-space.json'), 'utf-8'));
@@ -1029,6 +1342,11 @@ function getRandomIPv4ByRIR(rir, num = 100, excludeBogon = true) {
   return ips;
 }
 
+/**
+ * Generates a random IPv6 address.
+ *
+ * @returns {string} Random IPv6 literal.
+ */
 function getRandomIPv6() {
   // Generate eight groups of four hexadecimal digits each
   const groups = Array.from({ length: 8 }, () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0'));
@@ -1037,6 +1355,14 @@ function getRandomIPv6() {
   return ipv6Address;
 }
 
+/**
+ * Generates a list of random IP addresses with configurable family mix.
+ *
+ * @param {number} [num=100] - Amount of addresses to return.
+ * @param {boolean} [excludeBogon=true] - Avoid reserved IPv4 spaces.
+ * @param {boolean} [mixInIPv6=false] - Include IPv6 candidates when true.
+ * @returns {string[]} Array of IP addresses.
+ */
 function getRandomIPs(num = 100, excludeBogon = true, mixInIPv6 = false) {
   let ips = [];
   for (let i = 0; i < num; i++) {
@@ -1049,6 +1375,12 @@ function getRandomIPs(num = 100, excludeBogon = true, mixInIPv6 = false) {
   return ips;
 }
 
+/**
+ * Generates a list of random IPv6 addresses.
+ *
+ * @param {number} [num=100] - Amount of addresses to return.
+ * @returns {string[]} Array of IPv6 literals.
+ */
 function getRandomIPv6Addresses(num = 100) {
   let ips = [];
   for (let i = 0; i < num; i++) {
@@ -1126,6 +1458,12 @@ const lastResortStartsWith = [
   'dynamic cust',
 ];
 
+/**
+ * Flags organisations that should only be used as a fallback match.
+ *
+ * @param {string} orgName - Organisation name from WHOIS/IP geodata.
+ * @returns {boolean} True when the organisation should be considered last resort.
+ */
 const isLastResortOrg = (orgName) => {
   const normOrg = orgName.toLowerCase().trim();
 
@@ -1148,6 +1486,12 @@ const isLastResortOrg = (orgName) => {
   return false;
 };
 
+/**
+ * Computes integer log2 using bit shifts for BigInt values.
+ *
+ * @param {bigint} value - Positive BigInt value.
+ * @returns {bigint} floor(log2(value)).
+ */
 function ilog2_bs(value) {
   let result = 0n, i, v;
   for (i = 1n; value >> (1n << i); i <<= 1n);
@@ -1161,10 +1505,24 @@ function ilog2_bs(value) {
   return result;
 }
 
+/**
+ * Checks whether a BigInt value is a power of two.
+ *
+ * @param {bigint} n - Value to test.
+ * @returns {boolean} True when n is a power of two.
+ */
 function isPowerOf2BigInt(n) {
   return n > 0n && (n & (n - 1n)) === 0n;
 }
 
+/**
+ * Converts an IPv6 inetnum range back to CIDR when the span is a power of two.
+ *
+ * @param {string|bigint} start - Starting IPv6 (string or BigInt).
+ * @param {string|bigint} end - Ending IPv6 (string or BigInt).
+ * @param {boolean} [isBigInt=false] - Treat inputs as BigInt when true.
+ * @returns {string|null} Equivalent CIDR or null when no single CIDR fits.
+ */
 function getCidrFromInet6num(start, end, isBigInt = false) {
   let startBigInt = null;
   let endBigInt = null;
@@ -1194,6 +1552,12 @@ function getCidrFromInet6num(start, end, isBigInt = false) {
   return null;
 }
 
+/**
+ * Converts an IPv4 inetnum back to CIDR when the range length is a power of two.
+ *
+ * @param {string} inetnum - IPv4 inetnum string.
+ * @returns {string|null} Equivalent CIDR or null when not representable.
+ */
 function getCidrFromInetnum(inetnum) {
   const [start, end] = inetnum.split('-').map(ip => ip.trim());
 
@@ -1212,6 +1576,12 @@ function getCidrFromInetnum(inetnum) {
   return null;
 }
 
+/**
+ * Returns both inetnum and CIDR variants for a given network descriptor.
+ *
+ * @param {string} network - Network in CIDR or inetnum format.
+ * @returns {{type:number,inetnum:string|null,cidr:string|null}} Summary with detected family.
+ */
 const getInetnumAndCidrFromNetwork = (network) => {
   const type = getNetworkType(network);
   let inetnum = null;
@@ -1241,6 +1611,14 @@ const getInetnumAndCidrFromNetwork = (network) => {
   return { type, inetnum, cidr };
 };
 
+/**
+ * Formats a network represented by numeric bounds into human or machine readable string.
+ *
+ * @param {Array} net - Two-element array with start/end bounds.
+ * @param {4|6} type - IP version.
+ * @param {boolean} [human=true] - Emit human-readable addresses when true.
+ * @returns {string} Formatted network string.
+ */
 const networkToStr = (net, type, human = true) => {
   if (type === 4) {
     if (human) {
@@ -1257,10 +1635,23 @@ const networkToStr = (net, type, human = true) => {
   }
 };
 
+/**
+ * Compares two numeric network tuples for equality.
+ *
+ * @param {Array} net1 - First [start,end] pair.
+ * @param {Array} net2 - Second [start,end] pair.
+ * @returns {boolean} True when both bounds match.
+ */
 const isSameArrNet = (net1, net2) => {
   return net1[0] === net2[0] && net1[1] === net2[1];
 };
 
+/**
+ * Collapses an IPv6 BigInt into a custom shorthand format for compact storage.
+ *
+ * @param {bigInt.BigInteger} ipBigInt - IPv6 value.
+ * @returns {string} Collapsed representation.
+ */
 const collapseIPv6OwnFormat = (ipBigInt) => {
   const ip = IPv6.fromBigInt(ipBigInt).toString();
   const collapsed = abbreviateIPv6(ip);
@@ -1292,6 +1683,12 @@ const collapseIPv6OwnFormat = (ipBigInt) => {
   return newFormat;
 };
 
+/**
+ * Expands a custom collapsed IPv6 string back into its BigInt representation.
+ *
+ * @param {string} ip - Collapsed IPv6 string.
+ * @returns {bigInt.BigInteger|undefined} BigInt value or undefined on parse error.
+ */
 const uncollapseIPv6OwnFormat = (ip) => {
   const suffixes = [
     { suffix: "_", replacement: "::" },
@@ -1323,6 +1720,12 @@ const uncollapseIPv6OwnFormat = (ip) => {
   }
 };
 
+/**
+ * Enumerates every IP contained in an inetnum range.
+ *
+ * @param {string} network - Inetnum string.
+ * @returns {string[]} Array of IP addresses.
+ */
 const getAllIPsFromNetwork = (network) => {
   const ips = [];
   const [start, end] = network.split(' - ');
