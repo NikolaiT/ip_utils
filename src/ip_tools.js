@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const { log, getRandomInt } = require('./utils');
 const bigInt = require('big-integer');
 const { expandIPv6Number } = require('ip-num');
@@ -7,6 +6,12 @@ const { IPv6 } = require('ip-num');
 const { IPv6CidrRange } = require('ip-num');
 const { IPv4CidrRange } = require('ip-num');
 const { Validator } = require('ip-num');
+
+const IPV4_ADDRESS_SPACE_PATH = '/Users/nikolaitschacher/projects/ip_api_data/ipapi_database/info_data/ipv4-address-space.json';
+const PUBLIC_RIRS = new Set(['AFRINIC', 'APNIC', 'ARIN', 'LACNIC', 'RIPE NCC']);
+let ipv4AddressSpaceCache = null;
+let ipv4AddressSpacePrefixesCache = new Map();
+let ipv4AddressSpaceLabelsCache = null;
 
 /**
  * Validates whether the provided network string represents a sane IPv4 or IPv6 range.
@@ -212,6 +217,11 @@ const cidrToInetnumSpecial = (cidrNetwork) => {
  * @returns {string|null} Inetnum string or null when conversion fails.
  */
 const cidrToInetnum = (cidr) => {
+  // if it is an inetnum, return it
+  if (isInetnum(cidr)) {
+    return cidr;
+  }
+  cidr = cleanNetwork(cidr);
   try {
     if (cidr.indexOf('.') !== -1) {
       const ipv4Range = IPv4CidrRange.fromCidr(cidr);
@@ -222,6 +232,7 @@ const cidrToInetnum = (cidr) => {
     }
     return cidr;
   } catch (err) {
+    console.error(err);
     console.error(`Error converting CIDR "${cidr}" to inetnum: ${err.message}`);
     return null;
   }
@@ -460,6 +471,15 @@ function isNetworkOrIp(input) {
   return isCidr(input) || isInetnum(input) || isIP(input);
 }
 
+function cleanNetwork(network) {
+  if (typeof network !== 'string') {
+    return network;
+  }
+  network = network.replace(/"/g, '').replace(/'/g, '');
+  network = network.trim();
+  return network;
+}
+
 /**
  * Validates inetnum formatted ranges and returns their IP version.
  *
@@ -470,6 +490,8 @@ function isInetnum(inetnum) {
   if (typeof inetnum !== 'string') {
     return false;
   }
+
+  inetnum = cleanNetwork(inetnum);
 
   // Quickly locate the first '-'
   const dashIndex = inetnum.indexOf('-');
@@ -1309,6 +1331,34 @@ function getRandomIPv4(excludeBogon = true) {
   }
 }
 
+const loadIpv4AddressSpace = () => {
+  if (!ipv4AddressSpaceCache) {
+    ipv4AddressSpaceCache = JSON.parse(fs.readFileSync(IPV4_ADDRESS_SPACE_PATH, 'utf-8'));
+  }
+  return ipv4AddressSpaceCache;
+};
+
+const getIpv4AddressSpaceLabels = () => {
+  if (!ipv4AddressSpaceLabelsCache) {
+    ipv4AddressSpaceLabelsCache = new Set(Object.values(loadIpv4AddressSpace()));
+  }
+  return ipv4AddressSpaceLabelsCache;
+};
+
+const getPrefixesForRir = (rir) => {
+  if (!ipv4AddressSpacePrefixesCache.has(rir)) {
+    const ipSpace = loadIpv4AddressSpace();
+    const prefixes = [];
+    for (const [prefix, owner] of Object.entries(ipSpace)) {
+      if (owner === rir) {
+        prefixes.push(parseInt(prefix, 10));
+      }
+    }
+    ipv4AddressSpacePrefixesCache.set(rir, prefixes);
+  }
+  return ipv4AddressSpacePrefixesCache.get(rir);
+};
+
 /**
  * Samples random IPv4 addresses that belong to allocations of a specific RIR.
  *
@@ -1317,28 +1367,59 @@ function getRandomIPv4(excludeBogon = true) {
  * @param {boolean} [excludeBogon=true] - Skip bogon ranges when true.
  * @returns {string[]} Array of IPv4 addresses.
  */
-function getRandomIPv4ByRIR(rir, num = 100, excludeBogon = true) {
-  let prefixesForRir = [];
-  const ipSpace = JSON.parse(fs.readFileSync(path.join(__dirname, './../../ip_api_data/ipapi_database/info_data/ipv4-address-space.json'), 'utf-8'));
-  for (const prefix in ipSpace) {
-    const org = ipSpace[prefix];
-    if (org === rir) {
-      prefixesForRir.push(parseInt(prefix));
-    }
+function getRandomIPv4ByRIR(rir, num = 100, options = {}) {
+  if (typeof rir !== 'string' || rir.trim() === '') {
+    throw new Error('rir must be a non-empty string');
   }
-  let ips = [];
+
+  const normalizedRir = rir.trim();
+  let optionBag = {};
+  if (typeof options === 'boolean') {
+    optionBag.excludeBogon = options;
+  } else if (options && typeof options === 'object') {
+    optionBag = { ...options };
+  }
+
+  const excludeBogon = optionBag.excludeBogon !== undefined ? optionBag.excludeBogon : true;
+  const excludeReserved = optionBag.excludeReserved !== undefined ? optionBag.excludeReserved : true;
+
+  if (!Number.isInteger(num) || num <= 0) {
+    throw new Error('num must be a positive integer');
+  }
+
+  const labels = getIpv4AddressSpaceLabels();
+  if (!labels.has(normalizedRir)) {
+    throw new Error(`Unknown RIR "${normalizedRir}". Ensure the value exists in ipv4-address-space.json.`);
+  }
+
+  if (excludeReserved && !PUBLIC_RIRS.has(normalizedRir)) {
+    throw new Error(`RIR "${normalizedRir}" is reserved. Set { excludeReserved: false } to allow it.`);
+  }
+
+  const prefixesForRir = getPrefixesForRir(normalizedRir);
+  if (!prefixesForRir || prefixesForRir.length === 0) {
+    throw new Error(`RIR "${normalizedRir}" has no IPv4 prefixes in the address space dataset.`);
+  }
+
+  const ips = [];
+  const maxAttempts = num * 50;
+  let attempts = 0;
+
   while (ips.length < num) {
-    const randomIndex = getRandomInt(0, prefixesForRir.length - 1);
-    const randomPrefix = prefixesForRir[randomIndex];
-    const ip = randomPrefix + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255) + '.' + getRandomInt(0, 255);
-    if (excludeBogon) {
-      if (!isBogon(ip)) {
-        ips.push(ip);
-      }
-    } else {
-      ips.push(ip);
+    if (attempts++ > maxAttempts) {
+      throw new Error(`Unable to generate ${num} IPv4 addresses for RIR "${normalizedRir}" with the current filters.`);
     }
+
+    const randomPrefix = prefixesForRir[getRandomInt(0, prefixesForRir.length - 1)];
+    const ip = `${randomPrefix}.${getRandomInt(0, 255)}.${getRandomInt(0, 255)}.${getRandomInt(0, 255)}`;
+
+    if (excludeBogon && isBogon(ip)) {
+      continue;
+    }
+
+    ips.push(ip);
   }
+
   return ips;
 }
 
@@ -1391,6 +1472,7 @@ function getRandomIPv6Addresses(num = 100) {
 
 // only pick this as an organization if no other organization matches
 const lastResortOrgsExact = [
+  "American Registry for Internet Numbers (ARIN)",
   "Internet Assigned Numbers Authority",
   'IANA',
   "RIPE",
