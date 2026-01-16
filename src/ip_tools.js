@@ -232,8 +232,6 @@ const cidrToInetnum = (cidr) => {
     }
     return cidr;
   } catch (err) {
-    console.error(err);
-    console.error(`Error converting CIDR "${cidr}" to inetnum: ${err.message}`);
     return null;
   }
 };
@@ -1472,6 +1470,7 @@ function getRandomIPv6Addresses(num = 100) {
 
 // only pick this as an organization if no other organization matches
 const lastResortOrgsExact = [
+  'American Registry for Internet Numbers, Ltd.',
   "American Registry for Internet Numbers (ARIN)",
   "Internet Assigned Numbers Authority",
   'IANA',
@@ -1519,6 +1518,7 @@ const lastResortOrgsExact = [
   'Asia Pacific Network Information Centre (APNIC)',
   'African Network Information Center (AFRINIC)',
   'RIPE Network Coordination Centre',
+  'The Western New York Regional Information Center (WNYRIC)',
 ];
 
 const lastResortOrgLut = {};
@@ -1533,6 +1533,8 @@ const lastResortIncludes = [
   ' Network Coordination Centre',
   ' Allocation Block',
   ' Assigned Numbers Authority',
+  ' Network Information Center',
+  ' Regional Information Center',
 ].map((element) => element.toLowerCase().trim());
 
 // if an org starts with one of those strings, pick it as a last resort
