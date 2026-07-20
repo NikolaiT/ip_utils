@@ -1033,7 +1033,7 @@ function isInInetnum(ip, inetnum) {
 const numHostsInCidrIPv4 = (cidr) => {
   let parts = cidr.split('/');
   let mask = parseInt(parts[1]);
-  if (mask > 32 || mask < 1) {
+  if (isNaN(mask) || mask > 32 || mask < 1) {
     throw Error(`Invalid IPv4 CIDR: ${cidr}`);
   }
   return 2 ** (32 - mask);
@@ -1185,7 +1185,7 @@ const isIPv6Network = (net) => {
 function numHostsInCidrIPv6(cidr) {
   let parts = cidr.split('/');
   let mask = parseInt(parts[1]);
-  if (mask > 128 || mask < 0) {
+  if (isNaN(mask) || mask > 128 || mask < 0) {
     throw Error(`Invalid IPv6 CIDR: ${cidr}`);
   }
   return bigInt(2).pow(128 - mask);
@@ -1236,6 +1236,28 @@ const isASN = (asn) => {
  * 
  * @returns all reserved IP ranges
  */
+/**
+ * Pre-computed [start, end] integer pairs for all IPv4 reserved/bogon blocks.
+ * https://en.wikipedia.org/wiki/Reserved_IP_addresses
+ */
+const RESERVED_IPV4_RANGES = [
+  [0, 16777215],           // 0.0.0.0/8
+  [167772160, 184549375],  // 10.0.0.0/8
+  [1681915904, 1686110207],// 100.64.0.0/10
+  [2130706432, 2147483647],// 127.0.0.0/8
+  [2851995648, 2852061183],// 169.254.0.0/16
+  [2886729728, 2887778303],// 172.16.0.0/12
+  [3221225472, 3221225727],// 192.0.0.0/24
+  [3221225984, 3221226239],// 192.0.2.0/24
+  [3227017984, 3227018239],// 192.88.99.0/24
+  [3232235520, 3232301055],// 192.168.0.0/16
+  [3323068416, 3323199487],// 198.18.0.0/15
+  [3325256704, 3325256959],// 198.51.100.0/24
+  [3405803776, 3405804031],// 203.0.113.0/24
+  [3758096384, 4026531839],// 224.0.0.0/4 (multicast)
+  [4026531840, 4294967295],// 240.0.0.0/4 (reserved)
+];
+
 /**
  * Returns a map of well-known IPv4 reserved or special-purpose ranges.
  *
@@ -1900,6 +1922,7 @@ module.exports = {
   parseIPv4Inetnum,
   parseIPv6Cidr,
   parseIPv6Inetnum,
+  RESERVED_IPV4_RANGES,
   startEndIpToNetwork,
   uncollapseIPv6OwnFormat,
   cidrToInetnum,
