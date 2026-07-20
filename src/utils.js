@@ -15,12 +15,7 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function delta(t0) {
-  return round(performance.now() - t0, 2);
-}
-
 module.exports = {
   log,
   getRandomInt,
-  delta
 };

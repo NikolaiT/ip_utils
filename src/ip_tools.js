@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { log, getRandomInt } = require('./utils');
 const bigInt = require('big-integer');
 const { expandIPv6Number } = require('ip-num');
@@ -7,7 +8,13 @@ const { IPv6CidrRange } = require('ip-num');
 const { IPv4CidrRange } = require('ip-num');
 const { Validator } = require('ip-num');
 
-const IPV4_ADDRESS_SPACE_PATH = '/Users/nikolaitschacher/projects/ip_api_data/ipapi_database/info_data/ipv4-address-space.json';
+// Path to a JSON map of IPv4 "/8" prefixes -> RIR label (derived from IANA's
+// IPv4 address space registry). Only the getRandomIPv4ByRIR() family needs it.
+// Override with the IPV4_ADDRESS_SPACE_PATH environment variable; the default is
+// resolved relative to this package so no machine-specific path is hardcoded.
+const IPV4_ADDRESS_SPACE_PATH =
+  process.env.IPV4_ADDRESS_SPACE_PATH ||
+  path.join(__dirname, '..', '..', 'ip_api_data', 'ipapi_database', 'info_data', 'ipv4-address-space.json');
 const PUBLIC_RIRS = new Set(['AFRINIC', 'APNIC', 'ARIN', 'LACNIC', 'RIPE NCC']);
 let ipv4AddressSpaceCache = null;
 let ipv4AddressSpacePrefixesCache = new Map();
@@ -1353,6 +1360,13 @@ function getRandomIPv4(excludeBogon = true) {
 
 const loadIpv4AddressSpace = () => {
   if (!ipv4AddressSpaceCache) {
+    if (!fs.existsSync(IPV4_ADDRESS_SPACE_PATH)) {
+      throw new Error(
+        `ipv4-address-space.json not found at ${IPV4_ADDRESS_SPACE_PATH}. ` +
+        `Set the IPV4_ADDRESS_SPACE_PATH environment variable to a JSON map of ` +
+        `IPv4 "/8" prefixes to RIR labels (derived from IANA's IPv4 address space registry).`
+      );
+    }
     ipv4AddressSpaceCache = JSON.parse(fs.readFileSync(IPV4_ADDRESS_SPACE_PATH, 'utf-8'));
   }
   return ipv4AddressSpaceCache;
