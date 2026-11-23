@@ -2,7 +2,8 @@ const { IPv6 } = require('ip-num');
 const { IPv6CidrToInt, IPv4CidrToInt, isASN, getNetworkType, networkToStartAndEndStr, parseIPv4Cidr,
   parseIPv6Cidr, isIPv4Network, isIPv6Inetnum, isIPv4Inetnum,
   isIPv4Cidr, isIPv6Cidr, isInetnum, isInInetnum, abbreviateIPv6,
-  IPv6IsLargerThan, isIPv6Strict, collapseIPv6OwnFormat, uncollapseIPv6OwnFormat } = require('./ip_tools');
+  IPv6IsLargerThan, isIPv6Strict, collapseIPv6OwnFormat, uncollapseIPv6OwnFormat,
+  isLastResortOrg } = require('./ip_tools');
 
 const testIpUtils = () => {
   // test IPv6CidrToInt
@@ -530,9 +531,48 @@ const testIPv6CollapseUncollapse = () => {
   }
 };
 
+const testIsLastResortOrg = () => {
+  const testCases = [
+    { input: 'American Registry for Internet Numbers, Ltd.', expected: true },
+    { input: 'SINGAPORE NETWORK INFORMATION CENTRE (SGNIC) PRIVATE LIMITED', expected: true },
+    { input: 'Network Information Center México', expected: true },
+    { input: 'National Internet Exchange of India', expected: true },
+    { input: 'Various Registries (Maintained by ARIN)', expected: true },
+    { input: 'NON RIPE NCC MANAGED ADDRESS BLOCK', expected: true },
+    { input: 'IP Pools', expected: true },
+    { input: 'Private Customer - AT&T Internet Services', expected: true },
+    { input: 'Entanet Customer', expected: true },
+    { input: 'OPTUS Customer Network', expected: true },
+    { input: 'PE-TDPERX6-LACNIC', expected: true },
+    { input: 'ORG-DODNIC-1', expected: true },
+    { input: 'DYNAMIC CUSTOMER POOL', expected: true },
+    { input: 'Please Send Abuse/SPAM complaints To Abuse@example.net', expected: true },
+    { input: 'Customers Bank', expected: false },
+    { input: 'DoD Network Information Center', expected: false },
+    { input: 'Navy Network Information Center (NNIC)', expected: false },
+    { input: 'Beijing Education Network Information Center', expected: false },
+    { input: 'Network Information Technology Ltd', expected: false },
+    { input: 'Hetzner Online GmbH', expected: false },
+    { input: 'constructor', expected: false },
+    { input: '', expected: false },
+    { input: null, expected: false },
+  ];
+
+  for (const { input, expected } of testCases) {
+    const result = isLastResortOrg(input);
+    if (result !== expected) {
+      throw new Error(
+        `isLastResortOrg(${JSON.stringify(input)}) returned ${result}; expected ${expected}.`
+      );
+    }
+  }
+  console.log(`PASS: isLastResortOrg passed ${testCases.length} cases.`);
+};
+
 if (require.main === module) {
   testIpUtils();
   testAbbreviateIPv6();
   testIsIPv6Strict();
   testIPv6CollapseUncollapse();
+  testIsLastResortOrg();
 }

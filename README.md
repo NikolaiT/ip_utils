@@ -93,7 +93,7 @@ Looking for a specific helper? Browse the API reference below for a categorised 
 - `isIPv4Network(network)`, `isIPv6Network(network)` – explicitly assert network families.
 - `getInetnumStartIP(range)` – return the first IP in an inetnum.
 - `isSameArrNet(a, b)` – compare numeric network tuples.
-- `isLastResortOrg(name)` – classify registry names reserved as fallback matches.
+- `isLastResortOrg(name)` – classify registry names and generic WHOIS placeholders reserved as fallback matches.
 
 ### Usage Notes
 

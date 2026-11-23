@@ -201,9 +201,10 @@ const filenameToInetnum = (filename) => {
   if (v === '4') {
     return `${IntToIPv4(parseInt(start))} - ${IntToIPv4(parseInt(end))}`;
   } else if (v === '6') {
-    let startIPv6 = IPv6.fromBigInt(bigInt(start)).toString();
-    let endIPv6 = IPv6.fromBigInt(bigInt(end)).toString();
-    return `${startIPv6} - ${endIPv6}`;
+    // IPv6.fromBigInt needs a native BigInt: a big-integer object is range
+    // checked via valueOf(), and values within 2^75 of the maximum round up
+    // past it and throw. IntToIPv6 already unwraps to the native value.
+    return `${IntToIPv6(start, false)} - ${IntToIPv6(end, false)}`;
   }
 };
 
@@ -1521,6 +1522,8 @@ const lastResortOrgsExact = [
   "American Registry for Internet Numbers",
   "This inetnum has been transfered as part of the ERX.",
   'African Network Information Center',
+  'African Network Information Centre',
+  'African Network Information Centre (AFRINIC)',
   'Taiwan Network Information Center',
   'China Network Information Center',
   'China Internet Network Information Center',
@@ -1530,6 +1533,12 @@ const lastResortOrgsExact = [
   'Korean Network Information Center',
   'Korea Network Information Center',
   'Taiwan Network Information Center',
+  'Network Information Center M*xico',
+  'Network Information Center México',
+  'NETWORK INFORMATION CENTER S.A. DE C.V.',
+  'Thai Network Information Center Foundation',
+  'Nepal Network Information Center Pvt. Ltd.',
+  'Network Information Center Madagascar - NIC-MG',
   'Reseaux IP Europeens Network Coordination Centre (RIPE NCC)',
   'APNIC AP',
   'ERX NETBLOCK',
@@ -1555,13 +1564,52 @@ const lastResortOrgsExact = [
   'African Network Information Center (AFRINIC)',
   'RIPE Network Coordination Centre',
   'The Western New York Regional Information Center (WNYRIC)',
+  'National Internet Exchange of India',
+  'Indian Registry for Internet Names and Numbers',
+  'NIXI',
+  'IRINN',
+  'CNNIC',
+  'JPNIC',
+  'KRNIC',
+  'TWNIC',
+  'VNNIC',
+  'IDNIC',
+  'APNIC Pty Ltd',
+  'ARIN Operations',
+  'APNIC Research and Development',
+  'APNIC Training Unit',
+  'APNIC Training Unit Team',
+  'APNIC Member Services 2',
+  'APNIC (Asia Pacific Network Information Centre)',
+  'LACNIC - Latin American and Caribbean IP address',
+  'Various Registries (Maintained by ARIN)',
+  'NON RIPE NCC MANAGED ADDRESS BLOCK',
+  'ORG-DODNIC-1',
+  'N*cleo de Inf. e Coord. do Ponto BR - NIC.BR',
+  'Núcleo de Inf. e Coord. do Ponto BR - NIC.BR',
+  'CENTRO DE ADMINISTRACION NIC.NI',
+  'BT-ADSL',
+  'DSL',
+  'ADSL',
+  'Internet Services',
+  'Business Internet',
+  'Routed Connection',
+  'N/A',
+  'Contact us to resolve user details',
+  'ISP abuse policy at http://aa.net.uk/abuse.html',
+  'Infrastructure',
+  'Internal infrastructure',
+  'Dedicated Server Hosting',
+  'Dedicated Servers',
+  'For small business',
+  'Static IPs',
+  'Static Assignment',
+  'Dynamic pools',
+  'c/o Andrews & Arnold Ltd',
 ];
 
-const lastResortOrgLut = {};
-for (const key of lastResortOrgsExact) {
-  const normKey = key.toLowerCase().trim();
-  lastResortOrgLut[normKey] = 1;
-}
+const normalizeLastResortOrg = (orgName) => orgName.toLowerCase().trim().replace(/\s+/g, ' ');
+const lastResortOrgLut = new Set(lastResortOrgsExact.map(normalizeLastResortOrg));
 
 // if an org includes one of those strings, pick it as a last resort
 const lastResortIncludes = [
@@ -1569,13 +1617,43 @@ const lastResortIncludes = [
   ' Network Coordination Centre',
   ' Allocation Block',
   ' Assigned Numbers Authority',
-  ' Network Information Center',
-  ' Regional Information Center',
-].map((element) => element.toLowerCase().trim());
+  ' American Registry for Internet Numbers',
+  ' Registry for Internet Names and Numbers',
+  ' Regional Internet Registry',
+  ' Maintainer For ERX Transfers',
+].map(normalizeLastResortOrg);
 
 // if an org starts with one of those strings, pick it as a last resort
 const lastResortStartsWith = [
   'dynamic cust',
+  'dynamic private network',
+  'dynamic corporate network',
+  'infrastructure for fastweb',
+  'isp abuse policy at',
+  'please send abuse',
+  'the western new york regional information center',
+].map(normalizeLastResortOrg);
+
+// Common WHOIS descriptions which identify an allocation class rather than an
+// organisation. Keep the expressions narrow enough not to catch company names
+// such as "Customers Bank".
+const lastResortPatterns = [
+  /(?:^|[\s_-])customers?[.!]?$/,
+  /\bcustomers?[-_\s]+(?:assignments?|allocations?|networks?|nets?|subnets?|pools?|lan|connections?|ranges?|blocks?|ip(?:v[46])?[-_\s]+(?:addresses?|space|ranges?|blocks?))\b/,
+  /\b(?:assigned|allocated)[-_\s]+to[-_\s]+(?:a[-_\s]+)?customers?(?=$|[^a-z])/,
+  /^(?:african|asia pacific|china(?: internet)?|indonesia|japan|korea(?:n)?|kenya|lesotho|singapore|taiwan|tanzania|vietnam(?: internet)?) network information cent(?:er|re)\b/,
+  /\b(?:subscriber|residential)[-_\s]+(?:lan[-_\s]+)?pools?\b/,
+  /\bstatically[-_\s]+assigned\b/,
+  /\bstatic[-_\s]+(?:ip(?:v[46])?[-_\s]+)?assignments?\b/,
+  /^(?:dynamic|ip)[-_\s]+pools?$/,
+  /^private[-_\s]+customer\b/,
+  /^pe-tdperx\d+-lacnic$/,
+  /^org-[a-z0-9]+-afrinic$/,
+  /^arin-\d+$/,
+  /^apnic[-_\s]+(?:anycast|region)\b/,
+  /^tdc\b.*\busers$/,
+  /\bregistry admin-c contact$/,
+  /\blocal registry(?:\s*\/\s*isp)?$/,
 ];
 
 /**
@@ -1585,9 +1663,16 @@ const lastResortStartsWith = [
  * @returns {boolean} True when the organisation should be considered last resort.
  */
 const isLastResortOrg = (orgName) => {
-  const normOrg = orgName.toLowerCase().trim();
+  if (typeof orgName !== 'string') {
+    return false;
+  }
 
-  if (normOrg in lastResortOrgLut) {
+  const normOrg = normalizeLastResortOrg(orgName);
+  if (!normOrg) {
+    return false;
+  }
+
+  if (lastResortOrgLut.has(normOrg)) {
     return true;
   }
 
@@ -1598,7 +1683,13 @@ const isLastResortOrg = (orgName) => {
   }
 
   for (const needle of lastResortStartsWith) {
-    if (orgName.startsWith(needle)) {
+    if (normOrg.startsWith(needle)) {
+      return true;
+    }
+  }
+
+  for (const pattern of lastResortPatterns) {
+    if (pattern.test(normOrg)) {
       return true;
     }
   }
